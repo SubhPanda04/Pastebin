@@ -28,6 +28,12 @@ app.get('/api/healthz', async (req, res) => {
     }
 });
 
+// Root redirect (helpful for local dev and navigation)
+app.get('/', (req, res) => {
+    // Redirect to the frontend (port 5173 locally, or base URL in prod)
+    res.redirect(process.env.FRONTEND_URL || 'http://localhost:5173');
+});
+
 // Create a paste
 app.post('/api/pastes', async (req, res) => {
     const { content, ttl_seconds, max_views } = req.body;
@@ -125,10 +131,27 @@ app.get('/p/:id', async (req, res) => {
         if (!paste ||
             (paste.expires_at && new Date(paste.expires_at) <= now) ||
             (paste.max_views && paste.view_count >= paste.max_views)) {
-            return res.status(404).send('<h1>404 Paste Not Found or Expired</h1>');
+            return res.status(404).send(`
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Paste Not Found</title>
+                    <script src="https://cdn.tailwindcss.com"></script>
+                </head>
+                <body class="bg-[#0f172a] text-slate-300 min-h-screen flex flex-col items-center justify-center p-4">
+                    <div class="text-center">
+                        <h1 class="text-6xl font-bold text-slate-700 mb-4">404</h1>
+                        <p class="text-xl mb-8 text-slate-400">This paste doesn't exist or has expired.</p>
+                        <a href="/" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-all shadow-lg">Back to Creation</a>
+                    </div>
+                </body>
+                </html>
+            `);
         }
 
-        // Increment view count for HTML view as well
+        // Increment view count for HTML view
         await sql`UPDATE pastes SET view_count = view_count + 1 WHERE id = ${id}`;
 
         // Render safely
@@ -140,26 +163,80 @@ app.get('/p/:id', async (req, res) => {
             .replace(/'/g, "&#039;");
 
         res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>View Paste</title>
-        <style>
-          body { font-family: monospace; padding: 20px; background: #0f172a; color: #e2e8f0; }
-          pre { background: #1e293b; padding: 15px; border-radius: 8px; white-space: pre-wrap; word-wrap: break-word; }
-        </style>
-      </head>
-      <body>
-        <h1>Paste Content</h1>
-        <pre>${safeContent}</pre>
-        <hr>
-        <a href="/" style="color: #38bdf8;">Create New Paste</a>
-      </body>
-      </html>
-    `);
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Pastebin - ${id}</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+                <style>
+                    body { background-color: #020202; color: #d4d4d8; font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+                    .mono { font-family: 'JetBrains Mono', monospace; }
+                    pre { white-space: pre-wrap; word-wrap: break-word; }
+                    .glass { background: rgba(5, 5, 8, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); }
+                </style>
+            </head>
+            <body class="min-h-screen py-10 px-6 flex flex-col items-center selection:bg-white/10">
+                <div class="w-full max-w-[900px]">
+                    <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 border-b border-white/10 pb-8">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-zinc-900 border border-white/20 flex items-center justify-center">
+                                <svg class="w-4 h-4 text-zinc-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4m8.5-12-5 16"/></svg>
+                            </div>
+                            <h1 class="text-xl font-medium tracking-tight text-white">Pastebin</h1>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">
+                           ${paste.expires_at ? `<div class="px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-full flex items-center gap-2">Expire: ${new Date(paste.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>` : ''}
+                           ${paste.max_views ? `<div class="px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-full flex items-center gap-2">View: ${paste.view_count + 1}/${paste.max_views}</div>` : ''}
+                           <div class="px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-full tracking-tighter text-zinc-500">${new Date(paste.created_at).toLocaleDateString()}</div>
+                        </div>
+                    </header>
+                    
+                    <main class="relative">
+                        <div class="glass rounded-2xl overflow-hidden">
+                            <div class="p-8 md:p-14 overflow-auto max-h-[80vh]">
+                                <pre class="text-[14px] leading-[1.9] mono text-zinc-100 tracking-tight">${safeContent}</pre>
+                            </div>
+                        </div>
+                    </main>
+
+                    <div class="mt-12 flex justify-end px-4">
+                        <a href="/" class="group flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-700 hover:text-white transition-all">
+                           <span>New Session</span>
+                           <span class="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </a>
+                    </div>
+
+                    <footer class="mt-24 text-center">
+                        <p class="text-[9px] text-zinc-900 font-bold uppercase tracking-[0.5em]">&copy; 2026 PASTEBIN</p>
+                    </footer>
+                </div>
+            </body>
+            </html>
+        `);
     } catch (error) {
         console.error('Failed to render paste:', error);
-        res.status(500).send('<h1>Internal Server Error</h1>');
+        res.status(500).send(`
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Server Error</title>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+                <script src="https://cdn.tailwindcss.com"></script>
+                <style>body { font-family: 'Inter', sans-serif; background: #09090b; }</style>
+            </head>
+            <body class="text-zinc-400 min-h-screen flex flex-col items-center justify-center p-6">
+                <div class="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center border border-white/5 mb-6 text-red-500 font-bold">!</div>
+                <h1 class="text-base font-medium text-white mb-2">Service Temporarily Unavailable</h1>
+                <p class="text-sm mb-8">We encountered a database error while retrieving this snippet.</p>
+                <a href="/" class="text-xs uppercase font-bold tracking-widest text-zinc-500 hover:text-white transition-colors">Return home</a>
+            </body>
+            </html>
+        `);
     }
 });
 
