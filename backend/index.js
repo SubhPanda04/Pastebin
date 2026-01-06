@@ -144,7 +144,7 @@ app.get('/p/:id', async (req, res) => {
                     <div class="text-center">
                         <h1 class="text-6xl font-bold text-slate-700 mb-4">404</h1>
                         <p class="text-xl mb-8 text-slate-400">This paste doesn't exist or has expired.</p>
-                        <a href="/" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-all shadow-lg">Back to Creation</a>
+                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-all shadow-lg">Back to Creation</a>
                     </div>
                 </body>
                 </html>
@@ -203,7 +203,7 @@ app.get('/p/:id', async (req, res) => {
                     </main>
 
                     <div class="mt-12 flex justify-end px-4">
-                        <a href="/" class="group flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-700 hover:text-white transition-all">
+                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" class="group flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-700 hover:text-white transition-all">
                            <span>New Session</span>
                            <span class="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                         </a>
