@@ -188,7 +188,10 @@ app.get('/p/:id', async (req, res) => {
                             <h1 class="text-xl font-medium tracking-tight text-white">Pastebin</h1>
                         </div>
                         <div class="flex flex-wrap gap-2 text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">
-                           ${paste.expires_at ? `<div class="px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-full flex items-center gap-2">Expire: ${new Date(paste.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>` : ''}
+                           ${paste.expires_at ? `<div id="expiry-timer" class="px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-full flex items-center gap-2" data-expires="${paste.expires_at}">
+                              <noscript>Expire: ${new Date(paste.expires_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</noscript>
+                              <span id="expiry-text">Calculating...</span>
+                           </div>` : ''}
                            ${paste.max_views ? `<div class="px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-full flex items-center gap-2">View: ${paste.view_count + 1}/${paste.max_views}</div>` : ''}
                            <div class="px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-full tracking-tighter text-zinc-500">${new Date(paste.created_at).toLocaleDateString()}</div>
                         </div>
@@ -213,6 +216,54 @@ app.get('/p/:id', async (req, res) => {
                         <p class="text-[9px] text-zinc-900 font-bold uppercase tracking-[0.5em]">&copy; 2026 PASTEBIN</p>
                     </footer>
                 </div>
+
+                ${paste.expires_at ? `
+                <script>
+                    function updateExpiryTimer() {
+                        const timerElement = document.getElementById('expiry-timer');
+                        const textElement = document.getElementById('expiry-text');
+                        
+                        if (!timerElement || !textElement) return;
+                        
+                        const expiresAt = new Date(timerElement.dataset.expires);
+                        const now = new Date();
+                        const diffMs = expiresAt - now;
+                        
+                        if (diffMs <= 0) {
+                            textElement.textContent = 'Expired';
+                            timerElement.classList.remove('text-zinc-400');
+                            timerElement.classList.add('text-red-400');
+                            // Reload the page to show the expired message
+                            setTimeout(() => location.reload(), 1000);
+                            return;
+                        }
+                        
+                        const totalSeconds = Math.floor(diffMs / 1000);
+                        const days = Math.floor(totalSeconds / 86400);
+                        const hours = Math.floor((totalSeconds % 86400) / 3600);
+                        const minutes = Math.floor((totalSeconds % 3600) / 60);
+                        const seconds = totalSeconds % 60;
+                        
+                        let timeString = 'Expires in ';
+                        
+                        if (days > 0) {
+                            timeString += days + 'd ' + hours + 'h';
+                        } else if (hours > 0) {
+                            timeString += hours + 'h ' + minutes + 'm';
+                        } else if (minutes > 0) {
+                            timeString += minutes + 'm ' + seconds + 's';
+                        } else {
+                            timeString += seconds + 's';
+                        }
+                        
+                        textElement.textContent = timeString;
+                    }
+                    
+                    // Update immediately and then every second
+                    updateExpiryTimer();
+                    setInterval(updateExpiryTimer, 1000);
+                </script>
+                ` : ''}
             </body>
             </html>
         `);
