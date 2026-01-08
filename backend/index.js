@@ -188,7 +188,7 @@ app.get('/p/:id', async (req, res) => {
                             <h1 class="text-xl font-medium tracking-tight text-white">Pastebin</h1>
                         </div>
                         <div class="flex flex-wrap gap-2 text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-400">
-                           ${paste.expires_at ? `<div id="expiry-timer" class="px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-full flex items-center gap-2" data-expires="${paste.expires_at}">
+                           ${paste.expires_at ? `<div id="expiry-timer" class="px-3 py-1.5 bg-zinc-950 border border-white/10 rounded-full flex items-center gap-2" data-expires="${paste.expires_at.toISOString()}" data-server-now="${now.toISOString()}">
                               <noscript>Expire: ${new Date(paste.expires_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</noscript>
                               <span id="expiry-text">Calculating...</span>
                            </div>` : ''}
@@ -219,22 +219,32 @@ app.get('/p/:id', async (req, res) => {
 
                 ${paste.expires_at ? `
                 <script>
+                    const timerElement = document.getElementById('expiry-timer');
+                    const textElement = document.getElementById('expiry-text');
+                    
+                    // Calculate clock offset between server and client
+                    const serverNow = new Date(timerElement.dataset.serverNow);
+                    const clientNow = new Date();
+                    const clockOffset = serverNow - clientNow;
+                    
                     function updateExpiryTimer() {
-                        const timerElement = document.getElementById('expiry-timer');
-                        const textElement = document.getElementById('expiry-text');
-                        
                         if (!timerElement || !textElement) return;
                         
                         const expiresAt = new Date(timerElement.dataset.expires);
-                        const now = new Date();
+                        // Use corrected time to match server's perspective
+                        const now = new Date(Date.now() + clockOffset);
                         const diffMs = expiresAt - now;
                         
                         if (diffMs <= 0) {
                             textElement.textContent = 'Expired';
                             timerElement.classList.remove('text-zinc-400');
                             timerElement.classList.add('text-red-400');
-                            // Reload the page to show the expired message
-                            setTimeout(() => location.reload(), 1000);
+                            
+                            // Only reload once the server definitely sees it as expired
+                            // Adding a slight buffer (500ms) to ensure the server-side check fails
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 500);
                             return;
                         }
                         
@@ -261,7 +271,14 @@ app.get('/p/:id', async (req, res) => {
                     
                     // Update immediately and then every second
                     updateExpiryTimer();
-                    setInterval(updateExpiryTimer, 1000);
+                    const intervalId = setInterval(() => {
+                        const expiresAt = new Date(timerElement.dataset.expires);
+                        const now = new Date(Date.now() + clockOffset);
+                        if (expiresAt - now <= 0) {
+                            clearInterval(intervalId);
+                        }
+                        updateExpiryTimer();
+                    }, 1000);
                 </script>
                 ` : ''}
             </body>
